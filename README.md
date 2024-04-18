@@ -1,98 +1,79 @@
-# PyArb
+PyArb的
+概述
+该项目旨在为 Uniswap V3 开发一个基于 Python 的套利机器人。该机器人旨在识别并可能利用同一代币对的不同 Uniswap V3 池之间的价格差异。该项目包括用于获取池数据、使用适当的代币小数计算价格以及识别简单和三角套利机会的脚本。
 
-## Overview
-This project aims to develop a Python-based arbitrage bot for Uniswap V3. The bot is designed to identify and potentially exploit price discrepancies across different Uniswap V3 pools for the same token pair. The project includes scripts for fetching pool data, calculating prices with proper token decimals, and identifying simple and triangular arbitrage opportunities.
+主模块
+main.py用作应用程序的主要入口点。它查询链上数据以提取加密货币的流动性和价格信息，评估这些数据是否存在潜在的套利机会，并允许重新分析以确定条件是否发生了变化以提供新的机会。
 
-## Main Module
-`main.py` serves as the primary entry point to the application. It queries on-chain data to extract liquidity and price information of cryptocurrencies, evaluates this data for potential arbitrage opportunities, and allows for reanalysis to determine if conditions have changed to present new opportunities.
+main_demo
 
-![main_demo](pyarb_simple_test.gif)
+数据转换和处理
+该过程首先使用 Web3.py 库建立与以太坊区块链的连接，并设置积极的 gas 价格策略以加快交易确认速度。
 
-### Data Transformation and Processing
+然后，它会提示用户以 ETH 和滑点容忍百分比输入所需的交易规模。滑点容错度定义了用户在交易签署和在区块链上执行之间愿意接受的最大价格变动。
 
-The process begins by establishing a connection to the Ethereum blockchain using the Web3.py library and sets aggressive gas price strategies for faster transaction confirmation.
+流动性和价格数据使用指定的 ABI 和池地址从 Uniswap V3 池合约中检索。 收集每个池地址的流动性，同时获取相应的值，表示 Uniswap V3 使用的价格。get_pool_liquidity_all()get_pool_price_all()sqrtPriceX96
 
-It then prompts the user to input the desired trade size in ETH and slippage tolerance percentage. Slippage tolerance defines the maximum price movement a user is willing to accept between the transaction's signing and its execution on the blockchain.
+流动性和价格数据都根据给定交易规模和用户的滑点容忍度确定的最小流动性截止值进行过滤。不满足此条件的池将被忽略。
 
-Liquidity and price data are retrieved from Uniswap V3 pool contracts using specified ABI and pool addresses. `get_pool_liquidity_all()` gathers liquidity for each pool address, while `get_pool_price_all()` fetches the corresponding `sqrtPriceX96` value, a representation of the price used by Uniswap V3.
+该函数将每个代币对的值转换为人类可读的价格，并调整代币小数点的差异。calculate_price()sqrtPriceX96
 
-Both the liquidity and price data undergo filtering based on the minimum liquidity cutoff determined by the given trade size and the user's slippage tolerance. Pools that do not satisfy this criterion are disregarded.
+每个单向交易都格式化为字典
+组装数据后，该文件会生成一个名为 keyed by strings 的字典，每个条目都包含一个元组列表。每个元组都包括代币地址、池地址、费用、流动性和指定代币之间交易的计算价格。pair_pricesTICKER_A_TO_TICKER_B
 
-The `calculate_price()` function converts the `sqrtPriceX96` value into human-readable prices for each token pair, adjusting for differences in the token decimals.
+盈利能力计算
+使用字典数据，应用程序计算过滤池对的套利机会。如果一种资产可以在一个市场（池）中以较低的价格买入，并在另一个市场（池）中以更高的价格出售，在考虑交易费用、滑点和燃料成本后，就存在套利机会。pair_prices
 
-### Each One-Way Trades Formatted as Dictionary
+该函数计算不同池中每个代币对的缩放买入和卖出价格。它考虑了交易/滑点成本，并使用gas费用（以Wei为单位，转换为ETH）来评估交易的潜在盈利能力。calculate_arbitrage_opportunities()
 
-Once the data is assembled, the file generates a dictionary named `pair_prices` keyed by `TICKER_A_TO_TICKER_B` strings, with each entry containing a list of tuples. Each tuple includes token addresses, the pool address, fee, liquidity, and the computed price for trading between the specified tokens.
+重新运行功能
+该脚本为用户提供了一个选项，无需重新启动程序即可重新运行数据检索和评估过程，只需在函数提示时输入“y”即可。池地址、币种地址和币种小数点已启动并从第一次运行开始保留。用户输入的交易金额和滑点容差也被保留。它获取新的 gas 价格并再次运行智能合约价格查询以寻找新机会。rerun()
 
-### Profitability Calculation
+其他模块
+该项目分为几个 Python 模块，每个模块都有特定的目的：
 
-Using the `pair_prices` dictionary data, the application computes arbitrage opportunities for the filtered pool pairs. An arbitrage opportunity exists if an asset can be bought in one market (pool) at a lower price and sold in another at a higher price, after accounting for transaction fees, slippage, and gas costs.
+coins.py：包含一个字典，将代币代码映射到其各自的以太坊合约地址。
+decimals.py：使用 Web3 库和 ERC-20 ABI 获取并存储每个令牌的小数点数。decimals
+pricing.py：查询 Uniswap V3 矿池合约的流动性和其他矿池特定数据。
+arbitrage_simple.py：通过比较不同池中的代币价格来识别简单的套利机会。
+arbitrage_triangle.py：通过在代币池的图形表示中查找长度为 3 的周期来识别三角套利机会。
+关键概念
+池数据：有关每个池的信息，包括代币地址、流动性和池费用。sqrt_price_x96
+价格计算：转换为实际代币价格，根据代币小数点进行调整。sqrt_price_x96
+图形构造：将令牌池表示为图形，其中节点是令牌，边是具有关联价格的池。
+套利识别：考虑交易方向，检测可利用价格差异获利的算法。
+用法
+环境设置：通过运行 来安装所需的 Python 包，例如 。web3pip install -r requirements.txt
 
-The `calculate_arbitrage_opportunities()` function calculates the scaled buy and sell prices for each token pair across different pools. It factors in transaction/slippage costs and uses gas fees (in Wei, converted to ETH) to evaluate potential profitability of a trade.
+以太坊节点配置：使用您的以太坊节点 HTTP 提供程序 URL 在项目的根目录中创建一个文件。例如：.env
 
-### Re-run Capabilities
+WEB3_PROVIDER_URL="https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
+令牌配置：在 中，通过指定其股票代码和以太坊合约地址来添加您希望机器人监控的令牌。例如：coins.py
 
-The script provides an option for the user to re-run the data retrieval and evaluation process without restarting the program, simply by inputting "y" when prompted by the `rerun()` function. The pool addresses, coin addresses, and coin decimal points are already initiated and retained from the first run. The user inputted trade amount and slippage tolerance are also kept. It fetches a new gas price and runs the smart contract price queries again for new opportunities.
+# coins.py
+coins = {
+    "WETH": '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+    "WBTC": '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
+    "DAI": '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    # Add more tokens as needed
+}
+Fetch Token Decimals：运行以提取并存储字典中每个令牌的小数位数。这些信息对于准确的价格计算至关重要。decimals.pycoins_decimals
 
+查询池数据：用于查询 Uniswap V3 池的最新数据，包括流动性、价格和费用。pricing.py
 
-## Other Modules
-The project is divided into several Python modules, each serving a specific purpose:
+识别套利机会：执行以识别同一代币对的不同池中的简单套利机会。或者，通过在代币图中查找盈利周期来识别三角套利机会。arbitrage_simple.pyarbitrage_triangle.py
 
-- `coins.py`: Contains a dictionary mapping token tickers to their respective Ethereum contract addresses.
-- `decimals.py`: Fetches and stores the number of decimals for each token using the Web3 library and the ERC-20 `decimals` ABI.
-- `pricing.py`: Queries Uniswap V3 pool contracts for liquidity and other pool-specific data.
-- `arbitrage_simple.py`: Identifies simple arbitrage opportunities by comparing the prices of a token across different pools.
-- `arbitrage_triangle.py`: Identifies triangular arbitrage opportunities by finding cycles of length three in a graph representation of token pools.
+审查结果：分析潜在套利机会的输出。这些脚本将打印有关盈利交易的信息，包括涉及的代币、执行交易的池以及预期的利润率。
 
-## Key Concepts
-
-- **Pool Data**: Information about each pool, including token addresses, liquidity, `sqrt_price_x96`, and pool fees.
-- **Price Calculation**: Conversion of `sqrt_price_x96` to actual token prices, adjusted for token decimals.
-- **Graph Construction**: Representation of token pools as a graph where nodes are tokens and edges are pools with associated prices.
-- **Arbitrage Identification**: Algorithms to detect price differences that can be exploited for profit, considering the direction of trades.
-
-## Usage
-
-1. **Environment Setup**: Install the required Python packages, such as `web3`, by running `pip install -r requirements.txt`.
-
-2. **Ethereum Node Configuration**: Create a `.env` file in the root directory of the project with your Ethereum node HTTP provider URL. For example:
-   ```
-   WEB3_PROVIDER_URL="https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID"
-   ```
-
-3. **Token Configuration**: In `coins.py`, add the tokens you want the bot to monitor by specifying their ticker symbols and Ethereum contract addresses. For example:
-   ```python
-   # coins.py
-   coins = {
-       "WETH": '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
-       "WBTC": '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
-       "DAI": '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-       # Add more tokens as needed
-   }
-   ```
-
-4. **Fetch Token Decimals**: Run `decimals.py` to fetch and store the number of decimals for each token in the `coins_decimals` dictionary. This information is crucial for accurate price calculations.
-
-5. **Query Pool Data**: Use `pricing.py` to query Uniswap V3 pools for the latest data, including liquidity, prices, and fees.
-
-6. **Identify Arbitrage Opportunities**: Execute `arbitrage_simple.py` to identify simple arbitrage opportunities across different pools for the same token pair. Alternatively, run `arbitrage_triangle.py` to identify triangular arbitrage opportunities by finding profitable cycles in the token graph.
-
-7. **Review Results**: Analyze the output for potential arbitrage opportunities. The scripts will print information about profitable trades, including the tokens involved, the pools to execute the trades, and the expected profit margins.
-
-## Considerations
-
-- **Slippage**: The bot currently does not account for slippage, which can significantly impact the profitability of arbitrage trades, especially in pools with low liquidity.
-- **Transaction Costs**: Ethereum gas fees are not considered in the current implementation and must be factored into the profitability calculation.
-- **Execution Time**: Prices on decentralized exchanges can change rapidly, so the bot must execute trades quickly to capture the identified opportunities.
-- **Smart Contract Interaction**: A production version of the bot would require smart contract integration to automate trade execution.
-
-## Future Work
-
-- Implement slippage estimation and include it in the profitability calculation.
-- Integrate with Ethereum wallets and smart contracts to enable automated trade execution.
-- Add real-time monitoring and alerting for arbitrage opportunities.
-- Optimize the bot's performance and improve its resilience to changing market conditions.
-
-## Disclaimer
-
-This project is for educational purposes only. Arbitrage trading carries financial risks, and you should perform your own due diligence before running any trading bot on a live network. The developers of this project are not responsible for any financial losses incurred from using this bot.
+考虑
+滑点：该机器人目前不考虑滑点，滑点会显着影响套利交易的盈利能力，尤其是在流动性低的池中。
+交易成本：以太坊 gas 费用在当前实施中不考虑，必须计入盈利能力计算。
+执行时间：去中心化交易所的价格可能会迅速变化，因此机器人必须快速执行交易以捕捉已识别的机会。
+智能合约交互：机器人的生产版本需要智能合约集成才能自动执行交易。
+未来工作
+实施滑点估计并将其包含在盈利能力计算中。
+与以太坊钱包和智能合约集成，实现自动交易执行。
+增加对套利机会的实时监控和警报。
+优化机器人的性能，提高其对不断变化的市场条件的适应能力。
+免責聲明
+本项目仅用于教育目的。套利交易存在财务风险，在实时网络上运行任何交易机器人之前，您应该进行自己的尽职调查。本项目的开发人员不对因使用此机器人而产生的任何经济损失负责。
